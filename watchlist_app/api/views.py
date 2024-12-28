@@ -1,5 +1,3 @@
-from django.core.serializers import serialize
-from django.http import HttpResponse
 from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_204_NO_CONTENT
 from rest_framework.views import APIView
 
@@ -7,15 +5,16 @@ from .serializers import StreamPlatformSerializer
 from ..models import WatchList, StreamPlatform
 from ..api.serializers import WatchListSerializer
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
 from rest_framework import status
 
 
 class StreamListAV(APIView):
     def get(self, request):
         platform = StreamPlatform.objects.all()
-        serializer = StreamPlatformSerializer(platform,many =True)
+        # serializer for HyperLinkRelatedField and HyperLinkedModelSerializer, because need context of request
+        serializer = StreamPlatformSerializer(platform,many=True, context={'request': request})
         return Response(serializer.data)
+        # serializer = StreamPlatformSerializer(platform,many =True)
 
 
     def post(self,request):
@@ -24,7 +23,7 @@ class StreamListAV(APIView):
             serializer.save()
             return Response(serializer.data, status= HTTP_201_CREATED)
         else:
-            return Response(serializer.erros, status = HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status = HTTP_400_BAD_REQUEST)
 
 
 
@@ -37,7 +36,8 @@ class StreamPlatformDetailAV(APIView):
                 { "error : Platform not found" },
                 status=HTTP_400_BAD_REQUEST
             )
-        serializer = StreamPlatformSerializer(platform)
+
+        serializer = StreamPlatformSerializer(platform, context={'request': request})
         return Response(
             serializer.data,
             status= HTTP_200_OK

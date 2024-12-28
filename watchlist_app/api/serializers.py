@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from rest_framework.relations import StringRelatedField
+
 from ..models import WatchList, StreamPlatform
 
 
@@ -58,10 +60,24 @@ class WatchListSerializer(serializers.ModelSerializer):
 
 
 ## Serializer with ModelSerializer
-class StreamPlatformSerializer (serializers.ModelSerializer):
+# Test with HyperLinkModelSerializer, the difference between ModelSerializer and HyperLinkedModelSerializer is
+# that HyperLinkenModelSerializer uses Hyperlinks and ModelSerializer uses primary keys.
+class StreamPlatformSerializer (serializers.HyperlinkedModelSerializer):
+# class StreamPlatformSerializer (serializers.ModelSerializer):
     # Create relationship in Serializer
     watchlist = WatchListSerializer(many=True, read_only=True)
+    # Test para serializer relations field
+    #watchlist = StringRelatedField(many = True) # get value __str__
+    # watchlist = serializers.PrimaryKeyRelatedField(many = True, read_only=True) # get pk model
+    # watchlist = serializers.HyperlinkedRelatedField(
+    #     many =True,
+    #     read_only = True,
+    #     view_name= 'watch-list-details'
+    # ) # created hyperlink for each object
 
     class Meta:
         model = StreamPlatform
         fields  ="__all__"
+        extra_kwargs = {
+            'url': {'view_name': 'stream-detail'}  # Este campo asegura que 'url' use la vista correcta
+        }
