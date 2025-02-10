@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.relations import StringRelatedField
 
-from ..models import WatchList, StreamPlatform
+from ..models import WatchList, StreamPlatform, Review
 
 
 #
@@ -48,11 +48,18 @@ from ..models import WatchList, StreamPlatform
 #
 
 
+class ReviewSerializer(serializers.ModelSerializer):
+    review_user = serializers.StringRelatedField(read_only =True)
+    class Meta:
+        model = Review
+        exclude = ('watchlist',)
+        # fields = "__all__"
 
 ### Serializer with ModelSerializer
 class WatchListSerializer(serializers.ModelSerializer):
     # Creamos un field personalizado
     # len_name = serializers.SerializerMethodField()
+    reviews = ReviewSerializer(many = True, read_only = True)
 
     class Meta:
         model  = WatchList
@@ -62,8 +69,8 @@ class WatchListSerializer(serializers.ModelSerializer):
 ## Serializer with ModelSerializer
 # Test with HyperLinkModelSerializer, the difference between ModelSerializer and HyperLinkedModelSerializer is
 # that HyperLinkenModelSerializer uses Hyperlinks and ModelSerializer uses primary keys.
-class StreamPlatformSerializer (serializers.HyperlinkedModelSerializer):
-# class StreamPlatformSerializer (serializers.ModelSerializer):
+# class StreamPlatformSerializer (serializers.HyperlinkedModelSerializer):
+class StreamPlatformSerializer (serializers.ModelSerializer):
     # Create relationship in Serializer
     watchlist = WatchListSerializer(many=True, read_only=True)
     # Test para serializer relations field

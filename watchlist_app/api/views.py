@@ -1,14 +1,139 @@
+from time import struct_time
+
+from django.contrib.messages import warning
+from django.core.serializers import serialize
+from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_204_NO_CONTENT
 from rest_framework.views import APIView
 
-from .serializers import StreamPlatformSerializer
-from ..models import WatchList, StreamPlatform
+from .permissions import IsAdminOrReadOnly, IsReviewUserOrReadOnly
+from .serializers import StreamPlatformSerializer, ReviewSerializer
+from ..models import WatchList, StreamPlatform, Review
 from ..api.serializers import WatchListSerializer
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, generics, mixins
+from rest_framework import viewsets
+
+# viewset y routers crear una vies para trabajhaer con una sola URL con dos objetivos listar y detail
+# literal hacer una view para dos urls, tratar dos peticiones con una view
+# class StreamPlatformVS(viewsets.ViewSet):
+#     def list(self, request):
+#         queryset = StreamPlatform.objects.all()
+#         serializer = StreamPlatformSerializer(queryset, many=True)
+#         return Response(serializer.data)
+#
+#     def retrieve(self,request, pk=None):
+#         queryset = StreamPlatform.objects.all()
+#         stream_platform = get_object_or_404(queryset,pk=pk)
+#         serializer = StreamPlatformSerializer(stream_platform)
+#         return Response(serializer.data)
+#
+#     def create(self, request):
+#         serializer = StreamPlatformSerializer(data =  request.data)
+#         if  serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data)
+#         else:
+#             return Response(serializer.errors)
+
+# ModewlviewSet, da todo crud completo
+#  ReadOnlyModelViewSet de igual manera se puede para readonlymodelviewset, solo que este solo da listar y detail
+class StreamPlatformVS(viewsets.ModelViewSet):
+    queryset = StreamPlatform.objects.all()
+    serializer_class = StreamPlatformSerializer
+
+class ReviewCreate(generics.CreateAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticated]
+    # Conseguimos todos los valores para el filtro para saber si el user ya hizo reseña a dicha movie
+    def get_queryset(self):
+        return Review.objects.all()
+
+    # no queryset ya que creamos
+    # sobreescribimos el metodo de create una review
+    def perform_create(self, serializer):
+        # conseguimos el pk de la url
+        pk  = self.kwargs.get('pk')
+        watchlist = WatchList.objects.get(pk = pk)
+        # conseguimos el usuarios
+        review_user = self.request.user
+        # filtramos y verificamos si el user ya hizo reseña en dicha move
+
+        review_queryset =Review.objects.filter(watchlist =watchlist, review_user =review_user )
+        # mensaje de error
+        if review_queryset.exists():
+            raise ValidationError("You have already reviewed this movie!")
+
+        if watchlist.number_rating == 0 : # no hay ninguna reseña por ende es el mismo valor de la review
+            watchlist.avg_rating = serializer.validated_data['rating']
+        else :
+            # si no sumamos lo que tenemos en avg_rating más lo de la review actual eso entre dos
+            watchlist.avg_rating = (watchlist.avg_rating + serializer.validated_data['rating'])/2
+        # sumanos al contador/Id de rating para esa pelicula,contador
+        watchlist.number_rating = watchlist.number_rating +1
+        watchlist.save()
+        # guardamos la review
+        serializer.save(watchlist = watchlist, review_user=review_user)
+
+# view basada en clases concretas listar y crear reviews
+class ReviewList(generics.ListCreateAPIView):
+    # queryset = Review.objects.all() // no porque necesitamos solo las reviews de una movie
+    serializer_class = ReviewSerializer
+    # agregamos permisos a personas solo auth
+    # permission_classes = [IsAuthenticatedOrReadOnly]
+    # permission_classes = [IsAuthenticated]
+    # custom permission
+    # permission_classes = [AdminOrReadOnly]
+
+    # necesitamos sobreescribir el queryset
+    def get_queryset(self):
+        # conseguimos el pk parametro
+        pk = self.kwargs['pk']
+        return Review.objects.filter(watchlist=pk)
+
+
+# view basada en clases concreta para indivduales reviews
+class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    # permission_classes = [AdminOrReadOnly]
+    permission_classes = [IsReviewUserOrReadOnly]
+
+
+# view con mixins para individuales review
+# class ReviewDetail(mixins.RetrieveModelMixin,
+#                    generics.GenericAPIView):
+#     queryset = Review.objects.all()
+#     serializer_class = ReviewSerializer
+#
+#     def get(self, request, *args, **kwargs):
+#         return self.retrieve(request, *args, **kwargs)
+#
+#
+#
+# # de prueba ya que con views de clases concretas es más rapido
+# class ReviewList(mixins.ListModelMixin, # listas las reviews (get opptimizado)9
+#                  mixins.CreateModelMixin, # post optimizado, crear Review
+#                  generics.GenericAPIView # clase padre  una generica de APIView
+#                  ):
+#     # queryset es un parametro de la clase GenericAPIView
+#     queryset = Review.objects.all()
+#     # serializer_class tambien es de la clase padre, debemos incidar el serializador del model
+#     serializer_class = ReviewSerializer
+#
+#     # este metodo hacer todo lo que nosotros haciamos en APIView  y lista todos las reviews
+#     # es el mismo de la doc
+#     def get(self, request, *args,**kwargs):
+#         return self.list(request, *args, **kwargs)
+#     # mismo de la doc
+#     def post(self,request, *args,**kwargs):
+#         return self.create(request, *args, *kwargs)
 
 
 class StreamListAV(APIView):
+    permission_classes = [IsAdminOrReadOnly]
     def get(self, request):
         platform = StreamPlatform.objects.all()
         # serializer for HyperLinkRelatedField and HyperLinkedModelSerializer, because need context of request
@@ -28,6 +153,7 @@ class StreamListAV(APIView):
 
 
 class StreamPlatformDetailAV(APIView):
+    permission_classes = [IsAdminOrReadOnly]
     def get(self,request,pk):
         try:
             platform = StreamPlatform.objects.get(pk = pk)
@@ -81,6 +207,7 @@ class StreamPlatformDetailAV(APIView):
 
 ### ApiView
 class WatchListAV(APIView):
+    permission_classes = [IsAdminOrReadOnly]
     def get(self,request):
         movies = WatchList.objects.all()
         serializer = WatchListSerializer(movies, many = True)
@@ -96,6 +223,7 @@ class WatchListAV(APIView):
             return Response(serializer.errors)
 
 class WatchListDetailAV(APIView):
+    permission_classes = [IsAdminOrReadOnly]
     def get(self,request,pk):
         try:
             movie = WatchList.objects.get(pk = pk)
