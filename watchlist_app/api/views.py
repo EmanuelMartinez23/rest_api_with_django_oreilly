@@ -6,10 +6,12 @@ from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_204_NO_CONTENT
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .permissions import IsAdminOrReadOnly, IsReviewUserOrReadOnly
 from .serializers import StreamPlatformSerializer, ReviewSerializer
+from .throttling import ReviewListThrottle, ReviewCreateThrottle
 from ..models import WatchList, StreamPlatform, Review
 from ..api.serializers import WatchListSerializer
 from rest_framework.response import Response
@@ -47,6 +49,7 @@ class StreamPlatformVS(viewsets.ModelViewSet):
 class ReviewCreate(generics.CreateAPIView):
     serializer_class = ReviewSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ReviewCreateThrottle]
     # Conseguimos todos los valores para el filtro para saber si el user ya hizo reseña a dicha movie
     def get_queryset(self):
         return Review.objects.all()
@@ -86,6 +89,7 @@ class ReviewList(generics.ListCreateAPIView):
     # permission_classes = [IsAuthenticated]
     # custom permission
     # permission_classes = [AdminOrReadOnly]
+    throttle_classes = [ReviewListThrottle]
 
     # necesitamos sobreescribir el queryset
     def get_queryset(self):
@@ -96,6 +100,10 @@ class ReviewList(generics.ListCreateAPIView):
 
 # view basada en clases concreta para indivduales reviews
 class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
+    # throttle_classes = [UserRateThrottle, AnonRateThrottle]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'review-detail'
+
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     # permission_classes = [AdminOrReadOnly]
