@@ -23,4 +23,4 @@ class IsReviewUserOrReadOnly(permissions.BasePermission):
         else:
             # Check permissions for write request
             # si el usuario de la review es el mismo que eta logueado puede return true
-            return obj.review_user == request.user
+            return obj.review_user == request.user or request.user.is_staff
