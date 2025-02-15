@@ -1,14 +1,17 @@
 from time import struct_time
+from warnings import filters
 
 from django.contrib.messages import warning
 from django.core.serializers import serialize
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_204_NO_CONTENT
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle, ScopedRateThrottle
 from rest_framework.views import APIView
 
+from .pagination import WatchListPagination, WatchListLOPagination, WatchListCPagination
 from .permissions import IsAdminOrReadOnly, IsReviewUserOrReadOnly
 from .serializers import StreamPlatformSerializer, ReviewSerializer
 from .throttling import ReviewListThrottle, ReviewCreateThrottle
@@ -84,12 +87,26 @@ class ReviewCreate(generics.CreateAPIView):
 class ReviewList(generics.ListCreateAPIView):
     # queryset = Review.objects.all() // no porque necesitamos solo las reviews de una movie
     serializer_class = ReviewSerializer
+    # pagination_class = WatchListPagination
+    # pagination_class = WatchListLOPagination
+    pagination_class = WatchListCPagination
     # agregamos permisos a personas solo auth
     # permission_classes = [IsAuthenticatedOrReadOnly]
     # permission_classes = [IsAuthenticated]
     # custom permission
     # permission_classes = [AdminOrReadOnly]
     throttle_classes = [ReviewListThrottle]
+    #
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['review_user__username', 'active']
+
+    # Searching
+    # filter_backends = [filters.SearchFilter]
+    # search_fields = ['review_user__username', 'active']
+
+    # Ordering
+    # filter_backends = [filters.OrderingFilter]
+    # ordering_fields = ['review_user__username', 'active']
 
     # necesitamos sobreescribir el queryset
     def get_queryset(self):
@@ -216,6 +233,7 @@ class StreamPlatformDetailAV(APIView):
 ### ApiView
 class WatchListAV(APIView):
     permission_classes = [IsAdminOrReadOnly]
+    pagination_class = WatchListPagination
     def get(self,request):
         movies = WatchList.objects.all()
         serializer = WatchListSerializer(movies, many = True)
@@ -263,3 +281,15 @@ class WatchListDetailAV(APIView):
         movie.delete()
         # se borra y mandamos que ya no hay contenido
         return Response(status= status.HTTP_204_NO_CONTENT)
+
+
+class UserReview(generics.ListAPIView):
+    serializer_class = ReviewSerializer
+    # URL
+    # def get_queryset(self):
+    #     username = self.kwargs['username']
+    #     return Review.objects.filter(review_user_username = username)
+
+    def get_queryset(self):
+        username = self.request.query_params.get('username',None)
+        return Review.objects.filter(review_user__username = username)

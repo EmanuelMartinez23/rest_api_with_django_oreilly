@@ -2,7 +2,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from .views import StreamPlatformDetailAV, ReviewList, ReviewDetail, ReviewCreate, StreamPlatformVS
+from .views import StreamPlatformDetailAV, ReviewList, ReviewDetail, ReviewCreate, StreamPlatformVS, UserReview
 from ..api.views import WatchListAV, WatchListDetailAV, StreamListAV
 
 # creamos un router
@@ -30,6 +30,10 @@ urlpatterns = [
     # viewsets and routers
     # incluimos el router
     # path('', include(router.urls))
+
+    # for filter urls
+    # path('review/<str:username>', UserReview.as_view(), name = 'user-review-detail'),
+    path('review/', UserReview.as_view(), name = 'user-review-detail'),
 
 
 ]

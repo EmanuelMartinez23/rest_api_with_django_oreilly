@@ -59,7 +59,7 @@ class ReviewSerializer(serializers.ModelSerializer):
 class WatchListSerializer(serializers.ModelSerializer):
     # Creamos un field personalizado
     # len_name = serializers.SerializerMethodField()
-    reviews = ReviewSerializer(many = True, read_only = True)
+    # reviews = ReviewSerializer(many = True, read_only = True)
 
     class Meta:
         model  = WatchList
